@@ -5,7 +5,7 @@ This plugin aims to make rythm game development and music syncing easier than ev
 
 <img width="928" alt="image" src="https://user-images.githubusercontent.com/10292944/209430133-356d68e8-1399-49c2-aace-00449e016006.png">
 
-GodotMidi makes it easy to sync midi files to their corresponding rendered audio, just add a new audio track and connect it to an audio stream player, when the animation is played, the audio should sync up and the MidiManager will fire off note event signals.
+GodotMidi makes it easy to sync midi files to their corresponding rendered audio, just add an audio stream to the auto-generated audio stream player (a child of MidiManager) and it will play when the midi file starts.
 
 <img width="325" alt="image" src="https://user-images.githubusercontent.com/10292944/209430189-eb94371b-b78c-4fda-8f2d-e694ec6fabe4.png">
 
