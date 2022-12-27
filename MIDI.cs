@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Linq;
 using Godot.Collections;
 
 /// <summary>
@@ -28,7 +29,7 @@ public class MIDI : Resource
         
         // create output animation
         Animation anim = new Animation();
-        
+
         // read header chunk
         RawMidiChunk headerChunk = new RawMidiChunk();
         midiData = headerChunk.LoadFromBytes(midiData);
@@ -50,10 +51,11 @@ public class MIDI : Resource
             anim.AddTrack(Animation.TrackType.Method);
             anim.TrackSetPath(i, "../MidiManager");
         }
-
-        float totalTime = 0;
+        
+        float[] trackTimes = new float[header.NumTracks];
         for (int trkIdx = 0; trkIdx < header.NumTracks; trkIdx++)
         {
+            float trackTime = 0;
             // read track chunk
             RawMidiChunk trackChunk = new RawMidiChunk();
             midiData = trackChunk.LoadFromBytes(midiData);
@@ -68,30 +70,70 @@ public class MIDI : Resource
             
             // loop through note events
             float time = 0;
-            for (int i = 0; i < track.NoteEvents.Count; i++)
+            for (int i = 0; i < track.EventPointers.Count; i++)
             {
                 // get event
-                MidiEventNote noteEvent = track.NoteEvents[i];
-                
-                // insert event as key in animation track
-                // note dict will store note, data, note type and track
-                Dictionary noteDict = new Dictionary();
-                noteDict.Add("method", "NoteEventInput");
-                noteDict.Add("args", new object[] { noteEvent.Note, noteEvent.Data, noteEvent.EventType, trkIdx });
-                
-                anim.TrackInsertKey(trkIdx, time, noteDict);
-                
-                // convert note delta time to microseconds
+                MidiTrackChunk.MidiEventPointer eventPointer = track.EventPointers[i];
+
+                double deltaTime = 0.0f;
                 double tickDuration = (double)header.Tempo / (double)header.Division;
-                double deltaMicroseconds = (double)noteEvent.DeltaTime * tickDuration;
+
+                if (eventPointer.Type == MidiTrackChunk.MidiEventType.Meta)
+                {
+                    MidiEventMeta metaEvent = track.MetaEvents[eventPointer.Index];
+                    
+                    // insert as key in animation track
+                    // key will contain type and data
+                    Dictionary evtDict = new Dictionary();
+                    evtDict.Add("method", "MetaEventInput");
+                    evtDict.Add("args", new object[] { metaEvent.EventType, metaEvent.EventData, trkIdx });
+
+                    // if it's a tempo change event, update the tempo
+                    if (metaEvent.EventType == MidiEventMeta.MidiMetaEventType.SetTempo)
+                    {
+                        header.Tempo = GodotMidiUtils.ToInt24BigEndian(metaEvent.EventData, 0);
+                        tickDuration = (double)header.Tempo / (double)header.Division;
+                    }
+                }
+
+                if (eventPointer.Type == MidiTrackChunk.MidiEventType.Note)
+                {
+                    MidiEventNote noteEvent = track.NoteEvents[eventPointer.Index];
+                
+                    // insert event as key in animation track
+                    Dictionary evtDict = new Dictionary();
+                    evtDict.Add("method", "NoteEventInput");
+                    evtDict.Add("args", new object[] { noteEvent.Note, noteEvent.Data, noteEvent.EventType, trkIdx });
+                
+                    anim.TrackInsertKey(trkIdx, time, evtDict);
+                
+                    deltaTime = (double)noteEvent.DeltaTime;
+                }
+
+                if (eventPointer.Type == MidiTrackChunk.MidiEventType.System)
+                {
+                    MidiEventSystem systemEvent = track.SystemEvents[eventPointer.Index];
+                    // insert event as key in animation track
+                    // note dict will store note, data, note type and track
+                    Dictionary evtDict = new Dictionary();
+                    evtDict.Add("method", "SystemEventInput");
+                    evtDict.Add("args", new object[] { systemEvent.EventType, trkIdx });
+                
+                    anim.TrackInsertKey(trkIdx, time, evtDict);
+                
+                    deltaTime = (double)systemEvent.DeltaTime;
+                }
+
+                double deltaMicroseconds = (double)deltaTime * tickDuration;
                 double deltaSeconds = deltaMicroseconds / 1000000.0;
                 time += (float)deltaSeconds;
-
+                
             }
-            totalTime += time;
+            trackTime += time;
+            trackTimes[trkIdx] = trackTime;
         }
         
-        anim.Length = totalTime;
+        anim.Length = trackTimes.Max();
         
         return anim;
     }
