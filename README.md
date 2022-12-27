@@ -37,6 +37,21 @@ GodotMidi makes it easy to sync midi files to their corresponding rendered audio
 
 5. Have fun! The animation player should work just as a normal animation player would, each green dot corresponds to a MIDI event and a function call to `NoteEventInput(...)` in the MidiManager node.
 
+Simply create a method in your script with the following signature:
+```
+void NoteEvent(int note, int data, MidiEventNote.NoteType type, int track)
+{
+}
+```
+
+Similarily in GDScript (not tested)
+```
+note_event(note, data, type, track):
+  # my cool midi thing
+```
+
+**Don't forget to link your function to the signal emitted by the MidiManager node!**
+
 ## Roadmap
 
 - Track names should display somehow in the animation window
